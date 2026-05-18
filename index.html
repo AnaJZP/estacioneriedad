@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estacionariedad en Series de Tiempo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --bg-card: #161b27;
+    --bg-panel: #1c2333;
+    --accent: #4ade80;
+    --accent2: #60a5fa;
+    --accent3: #f59e0b;
+    --accent4: #f87171;
+    --text: #e2e8f0;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
+    --border: #2d3748;
+    --border-light: #374151;
+  }
+
+  html, body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* HERO */
+  .hero {
+    background: linear-gradient(135deg, #0f1117 0%, #1a2035 50%, #0f1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 2.5rem 2rem 2rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: radial-gradient(ellipse at center, rgba(74,222,128,0.04) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .hero-tag {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid rgba(74,222,128,0.3);
+    padding: 3px 10px;
+    border-radius: 2px;
+    margin-bottom: 1rem;
+  }
+  .hero h1 {
+    font-size: 2.2rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #fff;
+    margin-bottom: 0.5rem;
+  }
+  .hero p {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    max-width: 580px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+  .formula-bar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.15rem;
+  }
+  .beta-pill {
+    background: rgba(74,222,128,0.15);
+    color: var(--accent);
+    border: 1px solid rgba(74,222,128,0.4);
+    padding: 4px 16px;
+    border-radius: 4px;
+    font-weight: 500;
+    min-width: 64px;
+    text-align: center;
+    transition: all 0.2s;
+  }
+
+  /* LAYOUT */
+  .main {
+    display: grid;
+    grid-template-columns: 290px 1fr;
+    min-height: calc(100vh - 200px);
+  }
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--bg-card);
+    border-right: 1px solid var(--border);
+    padding: 1.5rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .sidebar-section h3 {
+    font-size: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .slider-wrap { display: flex; flex-direction: column; gap: 0.5rem; }
+  .slider-header { display: flex; justify-content: space-between; align-items: center; }
+  .slider-label {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .slider-val {
+    font-size: 0.85rem;
+    font-weight: 500;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--accent);
+    background: rgba(74,222,128,0.1);
+    padding: 1px 8px;
+    border-radius: 3px;
+    min-width: 52px;
+    text-align: center;
+  }
+  input[type=range] {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg-card);
+    box-shadow: 0 0 6px rgba(74,222,128,0.5);
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+  .preset-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+  .preset-btn {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    padding: 0.55rem 0.4rem;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    line-height: 1.35;
+  }
+  .preset-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(74,222,128,0.06); }
+  .preset-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(74,222,128,0.1); }
+  .preset-btn .pb-beta {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .preset-btn.active .pb-beta { color: var(--accent); }
+
+  .status-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.9rem;
+  }
+  .status-indicator { display: flex; align-items: center; gap: 8px; margin-bottom: 0.5rem; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.green { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .status-dot.yellow { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); }
+  .status-dot.blue { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+  .status-dot.red { background: var(--accent4); box-shadow: 0 0 6px var(--accent4); }
+  .status-label { font-size: 0.8rem; font-weight: 500; color: var(--text); }
+  .status-desc { font-size: 0.72rem; color: var(--text-dim); line-height: 1.5; }
+  .prop-list { display: flex; flex-direction: column; gap: 4px; margin-top: 0.6rem; }
+  .prop-item { display: flex; justify-content: space-between; font-size: 0.72rem; }
+  .prop-key { color: var(--text-muted); font-family: 'IBM Plex Mono', monospace; }
+  .prop-val { color: var(--text-dim); font-family: 'IBM Plex Mono', monospace; }
+  .prop-val.good { color: var(--accent); }
+  .prop-val.warn { color: var(--accent3); }
+  .prop-val.bad { color: var(--accent4); }
+
+  .regen-btn {
+    background: rgba(74,222,128,0.1);
+    border: 1px solid rgba(74,222,128,0.3);
+    color: var(--accent);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    padding: 6px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+    width: 100%;
+    margin-top: 0.75rem;
+  }
+  .regen-btn:hover { background: rgba(74,222,128,0.2); border-color: var(--accent); }
+
+  /* CONTENT */
+  .content {
+    background: var(--bg);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+  .chart-area {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+  }
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+  .chart-title { font-size: 0.85rem; font-weight: 500; color: var(--text); }
+  .chart-subtitle { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; font-family: 'IBM Plex Mono', monospace; }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    padding: 0.65rem 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+  .tab-btn:last-child { border-right: none; }
+  .tab-btn.active { background: rgba(74,222,128,0.1); color: var(--accent); }
+  .tab-btn:hover:not(.active) { background: var(--bg-panel); color: var(--text-dim); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* NOISE CARDS */
+  .noise-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+  @media (max-width: 900px) { .noise-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 700px) { .noise-grid { grid-template-columns: 1fr; } }
+
+  .noise-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+  }
+  .noise-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+  .noise-name { font-size: 0.82rem; font-weight: 500; color: var(--text); }
+  .noise-tag {
+    font-size: 0.65rem;
+    font-family: 'IBM Plex Mono', monospace;
+    padding: 2px 7px;
+    border-radius: 3px;
+  }
+  .noise-tag.blue { background: rgba(96,165,250,0.15); color: var(--accent2); }
+  .noise-tag.amber { background: rgba(245,158,11,0.15); color: var(--accent3); }
+  .noise-tag.red { background: rgba(248,113,113,0.15); color: var(--accent4); }
+  .noise-tag.green { background: rgba(74,222,128,0.15); color: var(--accent); }
+  .noise-tag.pink { background: rgba(232,121,249,0.15); color: #e879f9; }
+  .noise-tag.dark { background: rgba(167,139,250,0.15); color: #a78bfa; }
+  .noise-desc { font-size: 0.71rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.6rem; }
+  .noise-formula {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    background: var(--bg);
+    padding: 4px 8px;
+    border-radius: 3px;
+    border-left: 2px solid var(--border-light);
+    margin-bottom: 0.6rem;
+  }
+  .noise-canvas-wrap {
+    height: 70px;
+    background: var(--bg);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .noise-canvas-wrap canvas { width: 100%; height: 70px; display: block; }
+
+  /* FOOTER */
+  footer {
+    text-align: center;
+    padding: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--bg-card);
+  }
+  footer a { color: var(--accent2); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-tag">EARF · SEPI · ESE · IPN</div>
+  <div style="font-size:0.78rem;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;margin-bottom:0.4rem;letter-spacing:0.04em;">Econometría Financiera &nbsp;·&nbsp; Ana Lorena Jiménez Preciado</div>
+  <h1>Estacionariedad</h1>
+  <p>Explora cómo el coeficiente β determina el comportamiento de un proceso AR(1) y la diferencia entre ruido blanco, caminata aleatoria y series explosivas.</p>
+  <div class="formula-bar">
+    <span style="color:var(--text-dim)">y<sub>t</sub> =</span>
+    <span class="beta-pill" id="hero-beta">0.00</span>
+    <span style="color:var(--text-dim)">· y<sub>t−1</sub> + u<sub>t</sub></span>
+  </div>
+</div>
+
+<div class="main">
+  <div class="sidebar">
+
+    <div class="sidebar-section">
+      <h3>Control AR(1)</h3>
+      <div class="slider-wrap">
+        <div class="slider-header">
+          <span class="slider-label">β (coeficiente AR)</span>
+          <span class="slider-val" id="beta-display">0.00</span>
+        </div>
+        <input type="range" id="beta-slider" min="-0.5" max="1.3" step="0.01" value="0">
+      </div>
+      <div class="slider-wrap" style="margin-top:0.85rem">
+        <div class="slider-header">
+          <span class="slider-label">n (observaciones)</span>
+          <span class="slider-val" id="n-display">500</span>
+        </div>
+        <input type="range" id="n-slider" min="100" max="2000" step="50" value="500">
+      </div>
+      <button class="regen-btn" id="regen-btn">↺ Regenerar u<sub>t</sub></button>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>Presets</h3>
+      <div class="preset-grid">
+        <button class="preset-btn active" data-beta="0" onclick="setPreset(this,0)">
+          <span class="pb-beta">β = 0</span>Ruido blanco
+        </button>
+        <button class="preset-btn" data-beta="0.5" onclick="setPreset(this,0.5)">
+          <span class="pb-beta">β = 0.5</span>Est. débil
+        </button>
+        <button class="preset-btn" data-beta="0.9" onclick="setPreset(this,0.9)">
+          <span class="pb-beta">β = 0.9</span>Persistente
+        </button>
+        <button class="preset-btn" data-beta="1" onclick="setPreset(this,1)">
+          <span class="pb-beta">β = 1</span>Caminata aleat.
+        </button>
+        <button class="preset-btn" data-beta="1.05" onclick="setPreset(this,1.05)">
+          <span class="pb-beta">β = 1.05</span>Explosiva leve
+        </button>
+        <button class="preset-btn" data-beta="1.1" onclick="setPreset(this,1.1)">
+          <span class="pb-beta">β = 1.1</span>Explosiva
+        </button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>Diagnóstico</h3>
+      <div class="status-card">
+        <div class="status-indicator">
+          <div class="status-dot green" id="status-dot"></div>
+          <span class="status-label" id="status-label">Ruido blanco</span>
+        </div>
+        <div class="status-desc" id="status-desc">Serie estrictamente estacionaria.</div>
+        <div class="prop-list">
+          <div class="prop-item">
+            <span class="prop-key">|β|</span>
+            <span class="prop-val good" id="prop-beta">0.00</span>
+          </div>
+          <div class="prop-item">
+            <span class="prop-key">Raíz unitaria</span>
+            <span class="prop-val good" id="prop-unit">No</span>
+          </div>
+          <div class="prop-item">
+            <span class="prop-key">Media muestral</span>
+            <span class="prop-val" id="prop-mean">—</span>
+          </div>
+          <div class="prop-item">
+            <span class="prop-key">Desv. estándar</span>
+            <span class="prop-val" id="prop-sd">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <div class="content">
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('serie',this)">Serie de tiempo</button>
+      <button class="tab-btn" onclick="switchTab('acf',this)">ACF</button>
+      <button class="tab-btn" onclick="switchTab('ruido',this)">Tipos de ruido</button>
+    </div>
+
+    <!-- TAB: Serie -->
+    <div class="tab-panel active" id="tab-serie">
+      <div class="chart-area">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title" id="chart-title">Ruido blanco</div>
+            <div class="chart-subtitle" id="chart-subtitle">β = 0 → y<sub>t</sub> = u<sub>t</sub></div>
+          </div>
+        </div>
+        <div style="position:relative;width:100%;height:240px;">
+          <canvas id="mainChart" role="img" aria-label="Serie de tiempo AR(1) con coeficiente beta ajustable"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: ACF -->
+    <div class="tab-panel" id="tab-acf">
+      <div class="chart-area">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Función de Autocorrelación (ACF)</div>
+            <div class="chart-subtitle">Rezagos 1–20 · Bandas de confianza 95% (líneas azules)</div>
+          </div>
+        </div>
+        <div style="position:relative;width:100%;height:240px;">
+          <canvas id="acfChart" role="img" aria-label="Función de autocorrelación de la serie generada"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Ruido -->
+    <div class="tab-panel" id="tab-ruido">
+      <div class="noise-grid" id="noise-grid"></div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<footer>
+  Econometría Financiera · Ana Lorena Jiménez Preciado · EARF SEPI ESE IPN ·
+  <a href="https://github.com/AnaJZP/estacioneriedad" target="_blank">github.com/AnaJZP/estacioneriedad</a>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+/* ── Generación de números aleatorios ── */
+function randn() {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+/* ── Estado global ── */
+let beta = 0, nObs = 500;
+let noiseData = [], seriesData = [];
+let mainChart = null, acfChart = null;
+const noiseCharts = [];
+
+/* ── Generación de datos ── */
+function genNoise() {
+  noiseData = [];
+  for (let i = 0; i < 2200; i++) noiseData.push(randn());
+}
+
+function genSeries() {
+  seriesData = new Array(nObs);
+  seriesData[0] = noiseData[0];
+  for (let t = 1; t < nObs; t++) {
+    seriesData[t] = beta * seriesData[t - 1] + noiseData[t];
+  }
+}
+
+/* ── ACF ── */
+function computeACF(data, maxLag) {
+  const n = data.length;
+  const mean = data.reduce((a, b) => a + b, 0) / n;
+  const vari = data.reduce((a, b) => a + (b - mean) ** 2, 0) / n;
+  if (vari === 0) return new Array(maxLag).fill(0);
+  const acf = [];
+  for (let lag = 1; lag <= maxLag; lag++) {
+    let cov = 0;
+    for (let i = lag; i < n; i++) cov += (data[i] - mean) * (data[i - lag] - mean);
+    acf.push(cov / (n * vari));
+  }
+  return acf;
+}
+
+/* ── Diagnóstico ── */
+function getStatus(b) {
+  if (Math.abs(b) < 0.001)
+    return { dot:'green', label:'Ruido blanco', desc:'Serie estrictamente estacionaria. Media y varianza constantes, sin autocorrelación serial.', bc:'good', unit:'No', uc:'good' };
+  if (Math.abs(b) < 1)
+    return { dot: Math.abs(b) < 0.7 ? 'green' : 'yellow', label:'Débilmente estacionaria', desc:`Media = 0 y varianza finita = σ²/(1−β²). La autocorrelación decae exponencialmente con el rezago.`, bc: Math.abs(b) < 0.7 ? 'good' : 'warn', unit:'No', uc:'good' };
+  if (Math.abs(b - 1) < 0.001)
+    return { dot:'blue', label:'Caminata aleatoria', desc:'Raíz unitaria exacta (β = 1). La varianza crece con t. Serie no estacionaria, sin reversión a la media.', bc:'warn', unit:'Sí (β = 1)', uc:'bad' };
+  return { dot:'red', label:'Serie explosiva', desc:'β > 1. La varianza crece sin límite. Proceso no estacionario y divergente — no tiene aplicación práctica directa.', bc:'bad', unit:'Explosiva', uc:'bad' };
+}
+
+/* ── Actualizar UI ── */
+function updateHeroBeta() {
+  document.getElementById('hero-beta').textContent = beta.toFixed(2);
+  document.getElementById('beta-display').textContent = beta.toFixed(2);
+  let title, sub;
+  if (Math.abs(beta) < 0.001) {
+    title = 'Ruido blanco';
+    sub = 'β = 0 → y<sub>t</sub> = u<sub>t</sub>';
+  } else if (Math.abs(beta - 1) < 0.001) {
+    title = 'Caminata aleatoria';
+    sub = 'β = 1 → y<sub>t</sub> = y<sub>t−1</sub> + u<sub>t</sub>';
+  } else if (Math.abs(beta) < 1) {
+    title = 'Serie débilmente estacionaria';
+    sub = `β = ${beta.toFixed(2)} → y<sub>t</sub> = ${beta.toFixed(2)}·y<sub>t−1</sub> + u<sub>t</sub>`;
+  } else {
+    title = 'Serie explosiva';
+    sub = `β = ${beta.toFixed(2)} → y<sub>t</sub> = ${beta.toFixed(2)}·y<sub>t−1</sub> + u<sub>t</sub>`;
+  }
+  document.getElementById('chart-title').innerHTML = title;
+  document.getElementById('chart-subtitle').innerHTML = sub;
+}
+
+function updateDiagnosis() {
+  const s = getStatus(beta);
+  document.getElementById('status-dot').className = 'status-dot ' + s.dot;
+  document.getElementById('status-label').textContent = s.label;
+  document.getElementById('status-desc').textContent = s.desc;
+  const pb = document.getElementById('prop-beta');
+  pb.textContent = Math.abs(beta).toFixed(2);
+  pb.className = 'prop-val ' + s.bc;
+  const pu = document.getElementById('prop-unit');
+  pu.textContent = s.unit;
+  pu.className = 'prop-val ' + s.uc;
+  const valid = seriesData.filter(v => isFinite(v));
+  if (valid.length > 0) {
+    const mean = valid.reduce((a,b) => a+b, 0) / valid.length;
+    const sd = Math.sqrt(valid.reduce((a,b) => a+(b-mean)**2, 0) / valid.length);
+    document.getElementById('prop-mean').textContent = mean.toFixed(3);
+    document.getElementById('prop-sd').textContent = sd.toFixed(3);
+  } else {
+    document.getElementById('prop-mean').textContent = '∞';
+    document.getElementById('prop-sd').textContent = '∞';
+  }
+}
+
+/* ── Gráfica principal ── */
+function buildMainChart() {
+  const ctx = document.getElementById('mainChart');
+  if (mainChart) mainChart.destroy();
+  const capped = seriesData.map(v => Math.max(-1e6, Math.min(1e6, v)));
+  mainChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: Array.from({length: nObs}, (_, i) => i + 1),
+      datasets: [{
+        data: capped,
+        borderColor: '#4ade80',
+        borderWidth: 1.2,
+        pointRadius: 0,
+        tension: 0,
+        fill: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: {
+        x: {
+          ticks: { color: '#64748b', font: { family: 'IBM Plex Mono', size: 10 }, maxTicksLimit: 8 },
+          grid: { color: 'rgba(100,116,139,0.08)' },
+          border: { color: 'rgba(100,116,139,0.2)' }
+        },
+        y: {
+          ticks: { color: '#64748b', font: { family: 'IBM Plex Mono', size: 10 }, maxTicksLimit: 6, callback: v => v.toFixed(1) },
+          grid: { color: 'rgba(100,116,139,0.08)' },
+          border: { color: 'rgba(100,116,139,0.2)' }
+        }
+      }
+    }
+  });
+}
+
+/* ── Gráfica ACF ── */
+function buildACFChart() {
+  const ctx = document.getElementById('acfChart');
+  if (acfChart) acfChart.destroy();
+  const maxLag = 20;
+  const acf = computeACF(seriesData, maxLag);
+  const conf = 1.96 / Math.sqrt(seriesData.length);
+  acfChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: Array.from({length: maxLag}, (_, i) => i + 1),
+      datasets: [
+        {
+          label: 'ACF',
+          data: acf,
+          backgroundColor: acf.map(v => Math.abs(v) > conf ? 'rgba(74,222,128,0.65)' : 'rgba(100,116,139,0.35)'),
+          borderWidth: 0
+        },
+        {
+          type: 'line',
+          label: 'IC+ 95%',
+          data: new Array(maxLag).fill(conf),
+          borderColor: 'rgba(96,165,250,0.6)',
+          borderWidth: 1.2,
+          borderDash: [4, 3],
+          pointRadius: 0,
+          fill: false
+        },
+        {
+          type: 'line',
+          label: 'IC− 95%',
+          data: new Array(maxLag).fill(-conf),
+          borderColor: 'rgba(96,165,250,0.6)',
+          borderWidth: 1.2,
+          borderDash: [4, 3],
+          pointRadius: 0,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.datasetIndex === 0 ? ` ACF(${ctx.label}) = ${ctx.raw.toFixed(4)}` : ''
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#64748b', font: { family: 'IBM Plex Mono', size: 10 } },
+          grid: { display: false },
+          border: { color: 'rgba(100,116,139,0.2)' },
+          title: { display: true, text: 'Rezago', color: '#64748b', font: { size: 11 } }
+        },
+        y: {
+          min: -1.1, max: 1.1,
+          ticks: { color: '#64748b', font: { family: 'IBM Plex Mono', size: 10 }, callback: v => v.toFixed(1) },
+          grid: { color: 'rgba(100,116,139,0.08)' },
+          border: { color: 'rgba(100,116,139,0.2)' }
+        }
+      }
+    }
+  });
+}
+
+/* ── Tipos de ruido ── */
+const noiseTypes = [
+  {
+    name: 'Ruido blanco gaussiano',
+    tag: 'Estacionario', tagClass: 'green',
+    desc: 'Distribución normal N(0,1). Media cero, varianza unitaria, independencia serial perfecta. Es la base del proceso AR(1) utilizado en esta demo.',
+    formula: 'u_t ~ N(0, σ²)',
+    color: '#4ade80',
+    gen: n => { const d=[]; for(let i=0;i<n;i++) d.push(randn()); return d; }
+  },
+  {
+    name: 'Ruido ARCH',
+    tag: 'Heteroscedástico', tagClass: 'amber',
+    desc: 'La volatilidad condicional varía en el tiempo: σ²_t depende del cuadrado del error previo. Muy común en series financieras (tipo de cambio, acciones).',
+    formula: 'u_t = σ_t·ε_t,  σ_t² = α₀ + α₁u²_{t-1}',
+    color: '#f59e0b',
+    gen: n => {
+      const d=[]; let u=0;
+      const a0=0.2, a1=0.75;
+      for(let i=0;i<n;i++){
+        const s2 = a0 + a1*u*u;
+        u = Math.sqrt(s2)*randn();
+        d.push(u);
+      }
+      return d;
+    }
+  },
+  {
+    name: 'Ruido uniforme',
+    tag: 'Estacionario', tagClass: 'blue',
+    desc: 'Distribución uniforme en [−√3, √3] para mantener varianza unitaria. Sin colas pesadas: los valores extremos son imposibles por construcción.',
+    formula: 'u_t ~ U(−√3, √3)',
+    color: '#60a5fa',
+    gen: n => { const d=[],s=Math.sqrt(3); for(let i=0;i<n;i++) d.push((Math.random()-0.5)*2*s); return d; }
+  },
+  {
+    name: 'Ruido con saltos (mezcla)',
+    tag: 'Leptocúrtico', tagClass: 'red',
+    desc: 'Con probabilidad 5% ocurre un shock de gran magnitud (cola pesada). Simula eventos extremos como crisis financieras o choques exógenos repentinos.',
+    formula: 'u_t = N(0,1) + J·N(0,9), P(J=1)=0.05',
+    color: '#f87171',
+    gen: n => { const d=[]; for(let i=0;i<n;i++){ const j=Math.random()<0.05?randn()*3:0; d.push(randn()+j); } return d; }
+  },
+  {
+    name: 'Ruido rosa (1/f)',
+    tag: '1/f · Memoria larga', tagClass: 'pink',
+    desc: 'La densidad espectral de potencia es proporcional a 1/f. Existe correlación a largo plazo: los valores pasados influyen en los futuros. Aparece en música, neurociencia y mercados financieros.',
+    formula: 'S(f) ∝ 1/f  (exponente ≈ 1)',
+    color: '#e879f9',
+    gen: n => {
+      const rows = 16;
+      const state = new Array(rows).fill(0).map(() => randn());
+      let running = state.reduce((a,b)=>a+b,0);
+      const d = [];
+      for (let i = 0; i < n; i++) {
+        const j = Math.floor(Math.log2((i|1) & -(i|1)));
+        const row = j < rows ? j : rows - 1;
+        running -= state[row];
+        state[row] = randn();
+        running += state[row];
+        d.push(running / rows);
+      }
+      const mean = d.reduce((a,b)=>a+b,0)/d.length;
+      const sd = Math.sqrt(d.reduce((a,b)=>a+(b-mean)**2,0)/d.length);
+      return d.map(v => (v - mean) / (sd || 1));
+    }
+  },
+  {
+    name: 'Ruido negro',
+    tag: '1/fᵝ · β > 2', tagClass: 'dark',
+    desc: 'Densidad espectral con β > 2. Correlaciones de muy largo plazo y varianza no estacionaria. Modela catástrofes, apagones en red y crisis sistémicas — eventos raros de alto impacto.',
+    formula: 'S(f) ∝ 1/f^β,  β > 2',
+    color: '#a78bfa',
+    gen: n => {
+      const d = [0];
+      for (let i = 1; i < n; i++) {
+        d.push(0.98 * d[i-1] + 0.15 * randn());
+      }
+      let acc = [0];
+      for (let i = 1; i < n; i++) acc.push(acc[i-1] + d[i]);
+      const mean = acc.reduce((a,b)=>a+b,0)/acc.length;
+      const sd = Math.sqrt(acc.reduce((a,b)=>a+(b-mean)**2,0)/acc.length);
+      return acc.map(v => (v - mean) / (sd || 1));
+    }
+  }
+];
+
+function buildNoiseMinis() {
+  const grid = document.getElementById('noise-grid');
+  grid.innerHTML = '';
+  noiseCharts.forEach(c => c.destroy());
+  noiseCharts.length = 0;
+  noiseTypes.forEach((nt, idx) => {
+    const card = document.createElement('div');
+    card.className = 'noise-card';
+    card.innerHTML = `
+      <div class="noise-card-header">
+        <span class="noise-name">${nt.name}</span>
+        <span class="noise-tag ${nt.tagClass}">${nt.tag}</span>
+      </div>
+      <div class="noise-desc">${nt.desc}</div>
+      <div class="noise-formula">${nt.formula}</div>
+      <div class="noise-canvas-wrap">
+        <canvas id="nc-${idx}" role="img" aria-label="Mini serie de ${nt.name}"></canvas>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+  noiseTypes.forEach((nt, idx) => {
+    const data = nt.gen(250);
+    const ctx = document.getElementById('nc-' + idx);
+    noiseCharts.push(new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: Array.from({length: 250}, (_, i) => i),
+        datasets: [{ data, borderColor: nt.color, borderWidth: 1, pointRadius: 0, tension: 0, fill: false }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: false,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        scales: { x: { display: false }, y: { display: false } }
+      }
+    }));
+  });
+}
+
+/* ── Refresh principal ── */
+function refresh() {
+  genSeries();
+  updateHeroBeta();
+  updateDiagnosis();
+  buildMainChart();
+  buildACFChart();
+}
+
+/* ── Eventos ── */
+document.getElementById('beta-slider').addEventListener('input', function() {
+  beta = parseFloat(this.value);
+  document.querySelectorAll('.preset-btn').forEach(b => {
+    b.classList.toggle('active', Math.abs(parseFloat(b.dataset.beta) - beta) < 0.005);
+  });
+  refresh();
+});
+
+document.getElementById('n-slider').addEventListener('input', function() {
+  nObs = parseInt(this.value);
+  document.getElementById('n-display').textContent = nObs;
+  refresh();
+});
+
+document.getElementById('regen-btn').addEventListener('click', function() {
+  genNoise();
+  refresh();
+});
+
+function setPreset(btn, b) {
+  document.querySelectorAll('.preset-btn').forEach(el => el.classList.remove('active'));
+  btn.classList.add('active');
+  beta = b;
+  document.getElementById('beta-slider').value = b;
+  refresh();
+}
+
+function switchTab(name, clickedBtn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if (clickedBtn) clickedBtn.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+/* ── Init ── */
+genNoise();
+refresh();
+buildNoiseMinis();
+</script>
+</body>
+</html>
