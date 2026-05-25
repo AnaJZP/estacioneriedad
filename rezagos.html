@@ -1,0 +1,1722 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estructuras de Rezagos AR / MA / ARMA</title>
+<meta name="description" content="Visualización interactiva de estructuras de rezagos en modelos AR, MA y ARMA con representación numérica y matricial para econometría financiera.">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --bg-card: #161b27;
+    --bg-panel: #1c2333;
+    --accent: #4ade80;
+    --accent2: #60a5fa;
+    --accent3: #f59e0b;
+    --accent4: #f87171;
+    --accent5: #a78bfa;
+    --text: #e2e8f0;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
+    --border: #2d3748;
+    --border-light: #374151;
+  }
+
+  html, body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* HERO */
+  .hero {
+    background: linear-gradient(135deg, #0f1117 0%, #1a2035 50%, #0f1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 2.5rem 2rem 2rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: radial-gradient(ellipse at center, rgba(96,165,250,0.04) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .hero-tag {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid rgba(74,222,128,0.3);
+    padding: 3px 10px;
+    border-radius: 2px;
+    margin-bottom: 1rem;
+  }
+  .hero h1 {
+    font-size: 2.2rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #fff;
+    margin-bottom: 0.5rem;
+  }
+  .hero p {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    max-width: 640px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+  .hero-nav {
+    margin-top: 1.2rem;
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+  }
+  .hero-nav a {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent2);
+    text-decoration: none;
+    border: 1px solid rgba(96,165,250,0.3);
+    padding: 5px 14px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    letter-spacing: 0.03em;
+  }
+  .hero-nav a:hover {
+    background: rgba(96,165,250,0.1);
+    border-color: var(--accent2);
+  }
+
+  /* LAYOUT */
+  .main {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    min-height: calc(100vh - 200px);
+  }
+  @media (max-width: 960px) {
+    .main { grid-template-columns: 1fr; }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--bg-card);
+    border-right: 1px solid var(--border);
+    padding: 1.5rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    overflow-y: auto;
+    max-height: calc(100vh - 160px);
+    position: sticky;
+    top: 0;
+  }
+  @media (max-width: 960px) {
+    .sidebar { max-height: none; position: static; }
+  }
+  .sidebar-section h3 {
+    font-size: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* MODEL SELECTOR */
+  .model-selector {
+    display: flex;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .model-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 0.6rem 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .model-btn:last-child { border-right: none; }
+  .model-btn.active { background: rgba(74,222,128,0.12); color: var(--accent); }
+  .model-btn:hover:not(.active) { background: rgba(255,255,255,0.03); color: var(--text-dim); }
+
+  /* SLIDERS */
+  .slider-wrap { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.6rem; }
+  .slider-header { display: flex; justify-content: space-between; align-items: center; }
+  .slider-label {
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .slider-val {
+    font-size: 0.82rem;
+    font-weight: 500;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--accent);
+    background: rgba(74,222,128,0.1);
+    padding: 1px 8px;
+    border-radius: 3px;
+    min-width: 48px;
+    text-align: center;
+  }
+  .slider-val.blue { color: var(--accent2); background: rgba(96,165,250,0.1); }
+  .slider-val.purple { color: var(--accent5); background: rgba(167,139,250,0.1); }
+  input[type=range] {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg-card);
+    box-shadow: 0 0 6px rgba(74,222,128,0.5);
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  input[type=range].blue-thumb::-webkit-slider-thumb {
+    background: var(--accent2);
+    box-shadow: 0 0 6px rgba(96,165,250,0.5);
+  }
+
+  .coef-group { transition: all 0.3s; }
+  .coef-group.hidden { display: none; }
+
+  /* PRESETS */
+  .preset-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+  .preset-btn {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    padding: 0.5rem 0.35rem;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    line-height: 1.35;
+  }
+  .preset-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(74,222,128,0.06); }
+  .preset-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(74,222,128,0.1); }
+  .preset-btn .pb-name {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .preset-btn.active .pb-name { color: var(--accent); }
+
+  /* CONTENT */
+  .content {
+    background: var(--bg);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    overflow-y: auto;
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    padding: 0.65rem 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+  .tab-btn:last-child { border-right: none; }
+  .tab-btn.active { background: rgba(74,222,128,0.1); color: var(--accent); }
+  .tab-btn:hover:not(.active) { background: var(--bg-panel); color: var(--text-dim); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* CARDS */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .card-title {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 0.15rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title .icon {
+    font-size: 1rem;
+    opacity: 0.8;
+  }
+  .card-subtitle {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+    margin-bottom: 1rem;
+  }
+
+  /* EQUATION DISPLAY */
+  .eq-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem 1.2rem;
+    margin-bottom: 0.75rem;
+    overflow-x: auto;
+  }
+  .eq-label {
+    font-size: 0.65rem;
+    font-family: 'IBM Plex Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+  }
+  .eq-content {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.9rem;
+    color: var(--text);
+    line-height: 1.8;
+    white-space: nowrap;
+  }
+  .eq-content .coef-ar { color: var(--accent); font-weight: 500; }
+  .eq-content .coef-ma { color: var(--accent2); font-weight: 500; }
+  .eq-content .op { color: var(--text-muted); }
+  .eq-content .var-y { color: #e879f9; }
+  .eq-content .var-u { color: var(--accent3); }
+  .eq-content .lag-op { color: var(--accent5); font-weight: 500; }
+
+  /* MATRIX DISPLAY */
+  .matrix-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 1rem 0;
+    overflow-x: auto;
+  }
+  .matrix {
+    display: inline-flex;
+    flex-direction: column;
+    position: relative;
+    padding: 0 0.4rem;
+  }
+  .matrix::before, .matrix::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 6px;
+    border: 2px solid var(--text-dim);
+  }
+  .matrix::before { left: -4px; border-right: none; border-radius: 3px 0 0 3px; }
+  .matrix::after { right: -4px; border-left: none; border-radius: 0 3px 3px 0; }
+  .matrix-row {
+    display: flex;
+    gap: 0.1rem;
+  }
+  .matrix-cell {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    min-width: 44px;
+    text-align: center;
+    padding: 3px 5px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .matrix-cell.highlight-ar { color: var(--accent); font-weight: 500; }
+  .matrix-cell.highlight-ma { color: var(--accent2); font-weight: 500; }
+  .matrix-cell.highlight-one { color: var(--text); font-weight: 500; }
+  .matrix-cell.highlight-zero { color: var(--border-light); }
+  .matrix-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    padding: 0 0.3rem;
+    align-self: center;
+  }
+  .matrix-eq-symbol {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    padding: 0 0.3rem;
+    align-self: center;
+  }
+  .matrix-vector-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  /* EIGENVALUE DISPLAY */
+  .eigen-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+  .eigen-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 0.5rem;
+  }
+  .eigen-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+  }
+  .eigen-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .eigen-dot.inside { background: var(--accent); box-shadow: 0 0 4px var(--accent); }
+  .eigen-dot.outside { background: var(--accent4); box-shadow: 0 0 4px var(--accent4); }
+  .eigen-dot.boundary { background: var(--accent3); box-shadow: 0 0 4px var(--accent3); }
+
+  /* NUMERIC TABLE */
+  .num-table-wrap {
+    overflow-x: auto;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+  .num-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+  }
+  .num-table th {
+    background: var(--bg-panel);
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 8px 10px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.68rem;
+    position: sticky;
+    top: 0;
+  }
+  .num-table th:first-child { text-align: center; }
+  .num-table td {
+    padding: 5px 10px;
+    text-align: right;
+    border-bottom: 1px solid rgba(45,55,72,0.5);
+    color: var(--text-dim);
+  }
+  .num-table td:first-child {
+    text-align: center;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .num-table tr:hover td {
+    background: rgba(74,222,128,0.03);
+  }
+  .num-table td.val-y { color: #e879f9; }
+  .num-table td.val-u { color: var(--accent3); }
+  .num-table td.val-lag { color: var(--text-dim); }
+  .num-table td.val-result { color: var(--accent); font-weight: 500; }
+
+  /* EXAMPLE BOX */
+  .example-box {
+    background: linear-gradient(135deg, rgba(96,165,250,0.06) 0%, rgba(167,139,250,0.04) 100%);
+    border: 1px solid rgba(96,165,250,0.2);
+    border-radius: 6px;
+    padding: 1rem 1.2rem;
+    margin-top: 0.75rem;
+  }
+  .example-box .ex-title {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--accent2);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .example-box .ex-text {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+  .example-box .ex-text strong { color: var(--text); font-weight: 500; }
+
+  /* STEP EXPLANATION */
+  .step-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+  }
+  .step-item {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+    padding: 0.5rem 0.6rem;
+    background: var(--bg);
+    border-radius: 4px;
+    border-left: 2px solid var(--border-light);
+  }
+  .step-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: rgba(74,222,128,0.1);
+    width: 20px; height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-text {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .step-text code {
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--accent);
+    font-size: 0.73rem;
+  }
+  .step-text code.ma { color: var(--accent2); }
+  .step-text code.y { color: #e879f9; }
+  .step-text code.u { color: var(--accent3); }
+
+  /* CHART */
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 200px;
+  }
+
+  /* STATUS CARD */
+  .status-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.9rem;
+  }
+  .status-indicator { display: flex; align-items: center; gap: 8px; margin-bottom: 0.5rem; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.green { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .status-dot.yellow { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); }
+  .status-dot.red { background: var(--accent4); box-shadow: 0 0 6px var(--accent4); }
+  .status-label { font-size: 0.8rem; font-weight: 500; color: var(--text); }
+  .status-desc { font-size: 0.72rem; color: var(--text-dim); line-height: 1.5; }
+
+  /* FOOTER */
+  footer {
+    text-align: center;
+    padding: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--bg-card);
+  }
+  footer a { color: var(--accent2); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-tag">EARF · SEPI · ESE · IPN</div>
+  <div style="font-size:0.78rem;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;margin-bottom:0.4rem;letter-spacing:0.04em;">Econometría Financiera &nbsp;·&nbsp; Ana Lorena Jiménez Preciado</div>
+  <h1>Estructuras de Rezagos</h1>
+  <p>Explora cómo se representan los modelos AR, MA y ARMA en forma de ecuación, operador de rezagos y notación matricial. Visualiza con valores numéricos concretos cómo cada observación depende de sus rezagos.</p>
+  <div class="hero-nav">
+    <a href="index.html">← Estacionariedad</a>
+    <a href="#" style="color:var(--accent); border-color:rgba(74,222,128,0.3);">📐 Rezagos AR/MA</a>
+  </div>
+</div>
+
+<div class="main">
+  <div class="sidebar">
+
+    <!-- MODEL SELECTOR -->
+    <div class="sidebar-section">
+      <h3>Modelo</h3>
+      <div class="model-selector">
+        <button class="model-btn active" id="btn-ar" onclick="selectModel('ar')">AR(p)</button>
+        <button class="model-btn" id="btn-ma" onclick="selectModel('ma')">MA(q)</button>
+        <button class="model-btn" id="btn-arma" onclick="selectModel('arma')">ARMA</button>
+      </div>
+    </div>
+
+    <!-- AR COEFFICIENTS -->
+    <div class="sidebar-section coef-group" id="ar-controls">
+      <h3>Coeficientes AR (φ)</h3>
+      <div class="slider-wrap">
+        <div class="slider-header">
+          <span class="slider-label">Orden p</span>
+          <span class="slider-val" id="p-display">1</span>
+        </div>
+        <input type="range" id="p-slider" min="1" max="4" step="1" value="1">
+      </div>
+      <div id="ar-sliders"></div>
+    </div>
+
+    <!-- MA COEFFICIENTS -->
+    <div class="sidebar-section coef-group hidden" id="ma-controls">
+      <h3>Coeficientes MA (θ)</h3>
+      <div class="slider-wrap">
+        <div class="slider-header">
+          <span class="slider-label">Orden q</span>
+          <span class="slider-val blue" id="q-display">1</span>
+        </div>
+        <input type="range" class="blue-thumb" id="q-slider" min="1" max="4" step="1" value="1">
+      </div>
+      <div id="ma-sliders"></div>
+    </div>
+
+    <!-- PRESETS -->
+    <div class="sidebar-section">
+      <h3>Presets — Riesgo Financiero</h3>
+      <div class="preset-grid" id="preset-grid"></div>
+    </div>
+
+    <!-- DIAGNOSIS -->
+    <div class="sidebar-section">
+      <h3>Diagnóstico</h3>
+      <div class="status-card">
+        <div class="status-indicator">
+          <div class="status-dot green" id="status-dot"></div>
+          <span class="status-label" id="status-label">Estacionario</span>
+        </div>
+        <div class="status-desc" id="status-desc">El proceso es estacionario.</div>
+      </div>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <div class="content">
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('eq',this)">Ecuación</button>
+      <button class="tab-btn" onclick="switchTab('matrix',this)">Matricial</button>
+      <button class="tab-btn" onclick="switchTab('table',this)">Tabla numérica</button>
+      <button class="tab-btn" onclick="switchTab('sim',this)">Simulación</button>
+    </div>
+
+    <!-- TAB: Ecuación -->
+    <div class="tab-panel active" id="tab-eq">
+      <div class="card">
+        <div class="card-title"><span class="icon">📝</span> Ecuación del modelo</div>
+        <div class="card-subtitle" id="eq-model-label">AR(1)</div>
+
+        <div class="eq-block">
+          <div class="eq-label">Forma explícita</div>
+          <div class="eq-content" id="eq-explicit"></div>
+        </div>
+
+        <div class="eq-block">
+          <div class="eq-label">Operador de rezagos (L)</div>
+          <div class="eq-content" id="eq-lagop"></div>
+        </div>
+
+        <div class="eq-block">
+          <div class="eq-label">Polinomio de rezagos</div>
+          <div class="eq-content" id="eq-poly"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="icon">🔍</span> ¿Qué hace cada rezago?</div>
+        <div class="card-subtitle">Desglose paso a paso</div>
+        <div class="step-list" id="lag-steps"></div>
+      </div>
+
+      <div class="example-box" id="finance-example"></div>
+    </div>
+
+    <!-- TAB: Matricial -->
+    <div class="tab-panel" id="tab-matrix">
+      <div class="card">
+        <div class="card-title"><span class="icon">🔢</span> Representación matricial</div>
+        <div class="card-subtitle" id="matrix-subtitle">Forma compañera (Companion Matrix) — AR</div>
+        <div id="matrix-display"></div>
+      </div>
+
+      <div class="card" id="eigen-card">
+        <div class="card-title"><span class="icon">◎</span> Eigenvalores y estacionariedad</div>
+        <div class="card-subtitle">Raíces de la ecuación característica</div>
+        <div id="eigen-display"></div>
+      </div>
+    </div>
+
+    <!-- TAB: Tabla numérica -->
+    <div class="tab-panel" id="tab-table">
+      <div class="card">
+        <div class="card-title"><span class="icon">📊</span> Tabla de cálculo paso a paso</div>
+        <div class="card-subtitle">Cómo se calcula cada y<sub>t</sub> a partir de sus rezagos</div>
+        <div class="num-table-wrap" style="max-height: 500px; overflow-y: auto;">
+          <table class="num-table" id="num-table"></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Simulación -->
+    <div class="tab-panel" id="tab-sim">
+      <div class="card">
+        <div class="card-title"><span class="icon">📈</span> Serie simulada</div>
+        <div class="card-subtitle" id="sim-subtitle">200 observaciones simuladas</div>
+        <div class="chart-wrap">
+          <canvas id="simChart" role="img" aria-label="Serie de tiempo simulada del modelo seleccionado"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="icon">📊</span> ACF empírica</div>
+        <div class="card-subtitle">Autocorrelación muestral — Rezagos 1 a 15</div>
+        <div class="chart-wrap">
+          <canvas id="acfSimChart" role="img" aria-label="Función de autocorrelación de la serie simulada"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<footer>
+  Econometría Financiera · Ana Lorena Jiménez Preciado · EARF SEPI ESE IPN ·
+  <a href="index.html">Estacionariedad</a> ·
+  <a href="https://github.com/AnaJZP/estacioneriedad" target="_blank">github.com/AnaJZP/estacioneriedad</a>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════
+   ESTRUCTURAS DE REZAGOS — AR / MA / ARMA
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Estado global ── */
+let currentModel = 'ar';  // 'ar', 'ma', 'arma'
+let p = 1, q = 1;
+let phi = [0.7, 0.0, 0.0, 0.0];   // AR coefficients φ₁..φ₄
+let theta = [-0.5, 0.0, 0.0, 0.0]; // MA coefficients θ₁..θ₄
+let simChart = null, acfSimChart = null;
+const N_SIM = 200;
+
+/* ── Presets de Riesgo Financiero ── */
+const presets = [
+  {
+    name: 'VaR AR(1)',
+    sub: 'Retornos con persistencia',
+    model: 'ar', p: 1, q: 1,
+    phi: [0.70, 0, 0, 0], theta: [-0.5, 0, 0, 0],
+    desc: '<strong>Value at Risk (VaR):</strong> Los retornos de un portafolio suelen mostrar autocorrelación positiva a corto plazo. Un AR(1) con φ₁ = 0.70 captura que un retorno positivo hoy tiende a predecir un retorno positivo (más moderado) mañana. Esto es clave para estimar el VaR a 1 día.'
+  },
+  {
+    name: 'Vol AR(2)',
+    sub: 'Volatilidad realizada',
+    model: 'ar', p: 2, q: 1,
+    phi: [0.45, 0.30, 0, 0], theta: [-0.5, 0, 0, 0],
+    desc: '<strong>Volatilidad realizada:</strong> La volatilidad de un activo depende de sus dos rezagos más recientes. φ₁ = 0.45 captura el efecto de ayer y φ₂ = 0.30 el efecto de anteayer. Suma φ₁ + φ₂ = 0.75 < 1 garantiza estacionariedad: la volatilidad revierte a su media de largo plazo.'
+  },
+  {
+    name: 'Spread MA(1)',
+    sub: 'Bid-ask spread',
+    model: 'ma', p: 1, q: 1,
+    phi: [0.7, 0, 0, 0], theta: [-0.40, 0, 0, 0],
+    desc: '<strong>Bid-Ask Spread:</strong> El spread entre compra y venta de un activo muestra autocorrelación negativa. Un MA(1) con θ₁ = −0.40 captura que un shock de liquidez (error) ayer reduce el spread hoy. El efecto del shock desaparece después de un periodo — "memoria corta".'
+  },
+  {
+    name: 'CDS MA(2)',
+    sub: 'Credit Default Swaps',
+    model: 'ma', p: 1, q: 2,
+    phi: [0.7, 0, 0, 0], theta: [0.50, 0.25, 0, 0],
+    desc: '<strong>Credit Default Swaps:</strong> Los cambios en spreads de CDS responden a shocks de crédito que persisten por 2 periodos. θ₁ = 0.50 captura la reacción inmediata y θ₂ = 0.25 la propagación retardada. Después de 2 periodos, el efecto desaparece completamente.'
+  },
+  {
+    name: 'ARMA(1,1)',
+    sub: 'Retornos + microestruc.',
+    model: 'arma', p: 1, q: 1,
+    phi: [0.80, 0, 0, 0], theta: [-0.35, 0, 0, 0],
+    desc: '<strong>Retornos con microestructura:</strong> ARMA(1,1) combina la persistencia del retorno (AR: φ₁ = 0.80) con el efecto de microestructura del mercado (MA: θ₁ = −0.35). La componente AR captura momentum, mientras que la MA captura el rebote del bid-ask bounce.'
+  },
+  {
+    name: 'ARMA(2,1)',
+    sub: 'Riesgo de tipo de cambio',
+    model: 'arma', p: 2, q: 1,
+    phi: [0.55, 0.20, 0, 0], theta: [0.30, 0, 0, 0],
+    desc: '<strong>Tipo de cambio:</strong> El rendimiento del tipo de cambio depende de los 2 periodos anteriores (momentum de corto plazo) y absorbe un shock de información con rezago. φ₁ + φ₂ = 0.75 asegura estacionariedad. θ₁ = 0.30 captura noticias que afectan el tipo de cambio.'
+  }
+];
+
+/* ── Utilidades ── */
+function randn() {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+function fmt(val, decimals = 2) {
+  return val >= 0 ? '+' + val.toFixed(decimals) : val.toFixed(decimals);
+}
+
+function fmtAbs(val, decimals = 2) {
+  return Math.abs(val).toFixed(decimals);
+}
+
+/* ── Build sliders ── */
+function buildARSliders() {
+  const container = document.getElementById('ar-sliders');
+  container.innerHTML = '';
+  for (let i = 0; i < p; i++) {
+    const wrap = document.createElement('div');
+    wrap.className = 'slider-wrap';
+    wrap.innerHTML = `
+      <div class="slider-header">
+        <span class="slider-label">φ${i + 1}</span>
+        <span class="slider-val" id="phi-${i}-display">${phi[i].toFixed(2)}</span>
+      </div>
+      <input type="range" id="phi-${i}" min="-0.95" max="0.95" step="0.05" value="${phi[i]}"
+             oninput="phi[${i}]=parseFloat(this.value);document.getElementById('phi-${i}-display').textContent=phi[${i}].toFixed(2);clearPreset();refresh();">
+    `;
+    container.appendChild(wrap);
+  }
+}
+
+function buildMASliders() {
+  const container = document.getElementById('ma-sliders');
+  container.innerHTML = '';
+  for (let i = 0; i < q; i++) {
+    const wrap = document.createElement('div');
+    wrap.className = 'slider-wrap';
+    wrap.innerHTML = `
+      <div class="slider-header">
+        <span class="slider-label">θ${i + 1}</span>
+        <span class="slider-val blue" id="theta-${i}-display">${theta[i].toFixed(2)}</span>
+      </div>
+      <input type="range" class="blue-thumb" id="theta-${i}" min="-0.95" max="0.95" step="0.05" value="${theta[i]}"
+             oninput="theta[${i}]=parseFloat(this.value);document.getElementById('theta-${i}-display').textContent=theta[${i}].toFixed(2);clearPreset();refresh();">
+    `;
+    container.appendChild(wrap);
+  }
+}
+
+/* ── Presets ── */
+function buildPresets() {
+  const grid = document.getElementById('preset-grid');
+  grid.innerHTML = '';
+  presets.forEach((pr, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn' + (idx === 0 ? ' active' : '');
+    btn.dataset.idx = idx;
+    btn.innerHTML = `<span class="pb-name">${pr.name}</span>${pr.sub}`;
+    btn.onclick = () => applyPreset(idx);
+    grid.appendChild(btn);
+  });
+}
+
+function applyPreset(idx) {
+  const pr = presets[idx];
+  currentModel = pr.model;
+  p = pr.p;
+  q = pr.q;
+  phi = [...pr.phi];
+  theta = [...pr.theta];
+
+  // Update UI
+  document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + pr.model).classList.add('active');
+  document.getElementById('p-slider').value = p;
+  document.getElementById('p-display').textContent = p;
+  document.getElementById('q-slider').value = q;
+  document.getElementById('q-display').textContent = q;
+
+  updateControlsVisibility();
+  buildARSliders();
+  buildMASliders();
+  highlightPreset(idx);
+  refresh();
+}
+
+function highlightPreset(idx) {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  const btns = document.querySelectorAll('.preset-btn');
+  if (btns[idx]) btns[idx].classList.add('active');
+}
+
+function clearPreset() {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+}
+
+/* ── Model selection ── */
+function selectModel(model) {
+  currentModel = model;
+  document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + model).classList.add('active');
+  updateControlsVisibility();
+  clearPreset();
+  refresh();
+}
+
+function updateControlsVisibility() {
+  const arC = document.getElementById('ar-controls');
+  const maC = document.getElementById('ma-controls');
+  if (currentModel === 'ar') {
+    arC.classList.remove('hidden');
+    maC.classList.add('hidden');
+  } else if (currentModel === 'ma') {
+    arC.classList.add('hidden');
+    maC.classList.remove('hidden');
+  } else {
+    arC.classList.remove('hidden');
+    maC.classList.remove('hidden');
+  }
+}
+
+/* ── Get model label ── */
+function getModelLabel() {
+  if (currentModel === 'ar') return `AR(${p})`;
+  if (currentModel === 'ma') return `MA(${q})`;
+  return `ARMA(${p},${q})`;
+}
+
+/* ── Build equations ── */
+function buildEquations() {
+  const labelEl = document.getElementById('eq-model-label');
+  labelEl.textContent = getModelLabel();
+
+  // Explicit form
+  let explicit = '<span class="var-y">y<sub>t</sub></span> <span class="op">=</span> ';
+  const arParts = [];
+  const maParts = [];
+
+  if (currentModel !== 'ma') {
+    for (let i = 0; i < p; i++) {
+      const val = phi[i];
+      const sign = val >= 0 ? (i === 0 ? '' : ' <span class="op">+</span> ') : ' <span class="op">−</span> ';
+      arParts.push(`${sign}<span class="coef-ar">${fmtAbs(val)}</span>·<span class="var-y">y<sub>t−${i + 1}</sub></span>`);
+    }
+  }
+
+  if (currentModel !== 'ar') {
+    for (let i = 0; i < q; i++) {
+      const val = theta[i];
+      const sign = val >= 0 ? ' <span class="op">+</span> ' : ' <span class="op">−</span> ';
+      maParts.push(`${sign}<span class="coef-ma">${fmtAbs(val)}</span>·<span class="var-u">u<sub>t−${i + 1}</sub></span>`);
+    }
+  }
+
+  if (arParts.length === 0 && maParts.length === 0) {
+    explicit += '<span class="var-u">u<sub>t</sub></span>';
+  } else {
+    explicit += arParts.join('');
+    explicit += ' <span class="op">+</span> <span class="var-u">u<sub>t</sub></span>';
+    explicit += maParts.join('');
+  }
+
+  document.getElementById('eq-explicit').innerHTML = explicit;
+
+  // Lag operator form
+  let lagop = '';
+  if (currentModel !== 'ma') {
+    // AR side: (1 - φ₁L - φ₂L² - ...)y_t
+    lagop += '<span class="op">(</span><span class="highlight-one">1</span>';
+    for (let i = 0; i < p; i++) {
+      const val = phi[i];
+      lagop += ` <span class="op">−</span> <span class="coef-ar">${fmtAbs(val)}</span>·<span class="lag-op">L`;
+      if (i > 0) lagop += `<sup>${i + 1}</sup>`;
+      lagop += '</span>';
+    }
+    lagop += '<span class="op">)</span><span class="var-y">y<sub>t</sub></span>';
+  } else {
+    lagop += '<span class="var-y">y<sub>t</sub></span>';
+  }
+
+  lagop += ' <span class="op">=</span> ';
+
+  if (currentModel !== 'ar') {
+    // MA side: (1 + θ₁L + θ₂L² + ...)u_t
+    lagop += '<span class="op">(</span><span class="highlight-one">1</span>';
+    for (let i = 0; i < q; i++) {
+      const val = theta[i];
+      if (val >= 0) {
+        lagop += ` <span class="op">+</span> <span class="coef-ma">${fmtAbs(val)}</span>`;
+      } else {
+        lagop += ` <span class="op">−</span> <span class="coef-ma">${fmtAbs(val)}</span>`;
+      }
+      lagop += `·<span class="lag-op">L`;
+      if (i > 0) lagop += `<sup>${i + 1}</sup>`;
+      lagop += '</span>';
+    }
+    lagop += '<span class="op">)</span>';
+  }
+  lagop += '<span class="var-u">u<sub>t</sub></span>';
+
+  document.getElementById('eq-lagop').innerHTML = lagop;
+
+  // Polynomial form
+  let poly = '';
+  if (currentModel !== 'ma') {
+    poly += '<span class="coef-ar">Φ(L)</span> <span class="op">=</span> 1';
+    for (let i = 0; i < p; i++) {
+      const val = phi[i];
+      poly += ` <span class="op">−</span> <span class="coef-ar">${fmtAbs(val)}</span>·<span class="lag-op">L`;
+      if (i > 0) poly += `<sup>${i + 1}</sup>`;
+      poly += '</span>';
+    }
+  }
+  if (currentModel === 'arma') poly += ' &nbsp;&nbsp;;&nbsp;&nbsp; ';
+  if (currentModel !== 'ar') {
+    poly += '<span class="coef-ma">Θ(L)</span> <span class="op">=</span> 1';
+    for (let i = 0; i < q; i++) {
+      const val = theta[i];
+      if (val >= 0) {
+        poly += ` <span class="op">+</span> <span class="coef-ma">${fmtAbs(val)}</span>`;
+      } else {
+        poly += ` <span class="op">−</span> <span class="coef-ma">${fmtAbs(val)}</span>`;
+      }
+      poly += `·<span class="lag-op">L`;
+      if (i > 0) poly += `<sup>${i + 1}</sup>`;
+      poly += '</span>';
+    }
+  }
+
+  if (currentModel === 'arma') {
+    poly += '<br><br><span class="coef-ar">Φ(L)</span><span class="var-y">y<sub>t</sub></span> <span class="op">=</span> <span class="coef-ma">Θ(L)</span><span class="var-u">u<sub>t</sub></span>';
+  }
+
+  document.getElementById('eq-poly').innerHTML = poly;
+}
+
+/* ── Build lag steps ── */
+function buildLagSteps() {
+  const container = document.getElementById('lag-steps');
+  let steps = [];
+  let stepNum = 1;
+
+  steps.push({
+    text: `<code class="u">u<sub>t</sub></code> es el <strong>shock o innovación</strong> en el periodo actual — un valor aleatorio que representa información nueva que llega al mercado.`
+  });
+
+  if (currentModel !== 'ma') {
+    for (let i = 0; i < p; i++) {
+      const lag = i + 1;
+      const coef = phi[i];
+      steps.push({
+        text: `El operador <code>L<sup>${lag > 1 ? lag : ''}</sup></code> "retrocede" ${lag} periodo${lag > 1 ? 's' : ''}. Así, <code>L<sup>${lag > 1 ? lag : ''}</sup></code><code class="y">y<sub>t</sub></code> = <code class="y">y<sub>t−${lag}</sub></code>. El coeficiente <code>φ<sub>${lag}</sub> = ${coef.toFixed(2)}</code> indica que <strong>${Math.abs(coef * 100).toFixed(0)}%</strong> del valor de hace ${lag} periodo${lag > 1 ? 's' : ''} se transmite al valor actual.`
+      });
+    }
+  }
+
+  if (currentModel !== 'ar') {
+    for (let i = 0; i < q; i++) {
+      const lag = i + 1;
+      const coef = theta[i];
+      steps.push({
+        text: `<code>L<sup>${lag > 1 ? lag : ''}</sup></code><code class="u">u<sub>t</sub></code> = <code class="u">u<sub>t−${lag}</sub></code>. El coeficiente <code class="ma">θ<sub>${lag}</sub> = ${coef.toFixed(2)}</code> indica que el shock de hace ${lag} periodo${lag > 1 ? 's' : ''} aún afecta <code class="y">y<sub>t</sub></code> con un peso de <strong>${Math.abs(coef * 100).toFixed(0)}%</strong>. ${lag === q ? 'Después de este rezago, el efecto del shock desaparece completamente.' : ''}`
+      });
+    }
+  }
+
+  container.innerHTML = steps.map((s, i) =>
+    `<div class="step-item">
+      <div class="step-num">${i + 1}</div>
+      <div class="step-text">${s.text}</div>
+    </div>`
+  ).join('');
+}
+
+/* ── Finance example ── */
+function buildFinanceExample() {
+  const box = document.getElementById('finance-example');
+  // Find matching preset or use generic
+  const matchIdx = presets.findIndex(pr => {
+    if (pr.model !== currentModel) return false;
+    if (currentModel !== 'ma' && pr.p !== p) return false;
+    if (currentModel !== 'ar' && pr.q !== q) return false;
+    return true;
+  });
+
+  const activePreset = document.querySelector('.preset-btn.active');
+  let desc = '';
+
+  if (activePreset) {
+    const idx = parseInt(activePreset.dataset.idx);
+    desc = presets[idx].desc;
+  } else if (matchIdx >= 0) {
+    desc = presets[matchIdx].desc;
+  } else {
+    // Generic example
+    if (currentModel === 'ar') {
+      desc = `<strong>Ejemplo de administración de riesgos:</strong> Un modelo AR(${p}) captura la persistencia en retornos financieros. Los coeficientes φ indican cuánto de la información pasada se transmite al periodo actual. Para estimar riesgos como el VaR, es crucial modelar correctamente esta estructura de dependencia temporal.`;
+    } else if (currentModel === 'ma') {
+      desc = `<strong>Ejemplo de administración de riesgos:</strong> Un modelo MA(${q}) captura cómo shocks pasados (noticias, eventos de mercado) afectan los precios durante ${q} periodo${q > 1 ? 's' : ''}. En la gestión de riesgos, esto es útil para modelar el impacto transitorio de eventos como cambios en política monetaria o reportes de ganancias.`;
+    } else {
+      desc = `<strong>Ejemplo de administración de riesgos:</strong> Un modelo ARMA(${p},${q}) combina persistencia (AR) con absorción de shocks (MA). En la práctica, los retornos de activos financieros muestran ambas características: momentum de corto plazo y respuesta a noticias. Este modelo es la base para estimar el VaR condicional y el Expected Shortfall.`;
+    }
+  }
+
+  box.innerHTML = `
+    <div class="ex-title">💼 Aplicación en Administración de Riesgos</div>
+    <div class="ex-text">${desc}</div>
+  `;
+}
+
+/* ── Build matrix display ── */
+function buildMatrixDisplay() {
+  const container = document.getElementById('matrix-display');
+  const subtitle = document.getElementById('matrix-subtitle');
+
+  let html = '';
+
+  if (currentModel === 'ar' || currentModel === 'arma') {
+    subtitle.textContent = currentModel === 'arma'
+      ? 'Companion Matrix (AR) + Estructura MA'
+      : 'Forma compañera (Companion Matrix)';
+
+    // Build companion matrix for AR(p)
+    const dim = Math.max(p, 1);
+    html += `<div style="margin-bottom:0.5rem; font-size:0.75rem; color:var(--text-dim);">Sistema de estado AR(${p}) en forma vectorial:</div>`;
+    html += '<div class="matrix-container">';
+
+    // State vector ξ_{t}
+    html += '<div>';
+    html += '<div class="matrix-vector-label"><span style="color:#e879f9">ξ<sub>t</sub></span></div>';
+    html += '<div class="matrix">';
+    for (let i = 0; i < dim; i++) {
+      html += `<div class="matrix-row"><div class="matrix-cell" style="color:#e879f9;">y<sub>t${i > 0 ? '−' + i : ''}</sub></div></div>`;
+    }
+    html += '</div></div>';
+
+    html += '<div class="matrix-eq-symbol">=</div>';
+
+    // Companion matrix F
+    html += '<div>';
+    html += '<div class="matrix-vector-label"><span style="color:var(--accent)">F</span></div>';
+    html += '<div class="matrix">';
+    // First row: φ₁ φ₂ ... φ_p
+    html += '<div class="matrix-row">';
+    for (let j = 0; j < dim; j++) {
+      const val = phi[j];
+      const cls = Math.abs(val) < 0.001 ? 'highlight-zero' : 'highlight-ar';
+      html += `<div class="matrix-cell ${cls}">${val.toFixed(2)}</div>`;
+    }
+    html += '</div>';
+    // Identity rows: I_{p-1} | 0
+    for (let i = 1; i < dim; i++) {
+      html += '<div class="matrix-row">';
+      for (let j = 0; j < dim; j++) {
+        if (j === i - 1) {
+          html += '<div class="matrix-cell highlight-one">1</div>';
+        } else {
+          html += '<div class="matrix-cell highlight-zero">0</div>';
+        }
+      }
+      html += '</div>';
+    }
+    html += '</div></div>';
+
+    // State vector ξ_{t-1}
+    html += '<div>';
+    html += '<div class="matrix-vector-label"><span style="color:#e879f9">ξ<sub>t−1</sub></span></div>';
+    html += '<div class="matrix">';
+    for (let i = 0; i < dim; i++) {
+      html += `<div class="matrix-row"><div class="matrix-cell" style="color:#e879f9;">y<sub>t−${i + 1}</sub></div></div>`;
+    }
+    html += '</div></div>';
+
+    html += '<div class="matrix-eq-symbol">+</div>';
+
+    // Noise vector
+    html += '<div>';
+    html += '<div class="matrix-vector-label"><span style="color:var(--accent3)">v<sub>t</sub></span></div>';
+    html += '<div class="matrix">';
+    for (let i = 0; i < dim; i++) {
+      if (i === 0) {
+        if (currentModel === 'arma') {
+          // ARMA: first element is u_t + θ₁u_{t-1} + ...
+          let label = 'u<sub>t</sub>';
+          for (let j = 0; j < q; j++) {
+            const tv = theta[j];
+            if (tv >= 0) label += ` + <span style="color:var(--accent2)">${fmtAbs(tv)}</span>u<sub>t−${j+1}</sub>`;
+            else label += ` − <span style="color:var(--accent2)">${fmtAbs(tv)}</span>u<sub>t−${j+1}</sub>`;
+          }
+          html += `<div class="matrix-row"><div class="matrix-cell" style="color:var(--accent3);font-size:0.68rem;">${label}</div></div>`;
+        } else {
+          html += `<div class="matrix-row"><div class="matrix-cell" style="color:var(--accent3);">u<sub>t</sub></div></div>`;
+        }
+      } else {
+        html += '<div class="matrix-row"><div class="matrix-cell highlight-zero">0</div></div>';
+      }
+    }
+    html += '</div></div>';
+    html += '</div>'; // /matrix-container
+
+  } else {
+    // Pure MA
+    subtitle.textContent = 'Representación matricial del proceso MA';
+
+    html += `<div style="margin-bottom:0.5rem; font-size:0.75rem; color:var(--text-dim);">Representación vectorial de MA(${q}) — El valor actual depende solo de shocks presentes y pasados:</div>`;
+    html += '<div class="matrix-container">';
+
+    // Vector of y values
+    html += '<div>';
+    html += '<div class="matrix-vector-label" style="color:#e879f9">Y</div>';
+    html += '<div class="matrix">';
+    const numRows = q + 3;
+    for (let i = 0; i < numRows; i++) {
+      html += `<div class="matrix-row"><div class="matrix-cell" style="color:#e879f9;">y<sub>${i + 1}</sub></div></div>`;
+    }
+    html += '</div></div>';
+
+    html += '<div class="matrix-eq-symbol">=</div>';
+
+    // Theta matrix
+    html += '<div>';
+    html += '<div class="matrix-vector-label" style="color:var(--accent2)">Θ</div>';
+    html += '<div class="matrix">';
+    for (let i = 0; i < numRows; i++) {
+      html += '<div class="matrix-row">';
+      for (let j = 0; j < numRows; j++) {
+        const lag = i - j;
+        if (lag === 0) {
+          html += '<div class="matrix-cell highlight-one">1</div>';
+        } else if (lag > 0 && lag <= q) {
+          const tv = theta[lag - 1];
+          const cls = Math.abs(tv) < 0.001 ? 'highlight-zero' : 'highlight-ma';
+          html += `<div class="matrix-cell ${cls}">${tv.toFixed(2)}</div>`;
+        } else {
+          html += '<div class="matrix-cell highlight-zero">0</div>';
+        }
+      }
+      html += '</div>';
+    }
+    html += '</div></div>';
+
+    // Vector of u values
+    html += '<div>';
+    html += '<div class="matrix-vector-label" style="color:var(--accent3)">U</div>';
+    html += '<div class="matrix">';
+    for (let i = 0; i < numRows; i++) {
+      html += `<div class="matrix-row"><div class="matrix-cell" style="color:var(--accent3);">u<sub>${i + 1}</sub></div></div>`;
+    }
+    html += '</div></div>';
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+/* ── Eigenvalues ── */
+function buildEigenDisplay() {
+  const container = document.getElementById('eigen-display');
+  const card = document.getElementById('eigen-card');
+
+  if (currentModel === 'ma') {
+    // MA is always stationary
+    container.innerHTML = `
+      <div style="font-size:0.75rem; color:var(--text-dim); line-height:1.6; padding:0.5rem 0;">
+        Los procesos MA(q) <strong style="color:var(--accent)">siempre son estacionarios</strong> independientemente de los valores de θ,
+        porque son sumas finitas de ruido blanco. No se requiere verificar eigenvalores.<br><br>
+        Sin embargo, para que el proceso sea <strong>invertible</strong> (y pueda representarse como un AR(∞)),
+        las raíces del polinomio Θ(z) deben estar fuera del círculo unitario.
+      </div>
+    `;
+    return;
+  }
+
+  // Compute eigenvalues of companion matrix
+  const eigenvals = computeEigenvalues();
+  let html = '<div style="font-size:0.75rem; color:var(--text-dim); line-height:1.6; margin-bottom:0.6rem;">';
+  html += `Para que un proceso AR(${p}) sea estacionario, <strong style="color:var(--text)">todos</strong> los eigenvalores de la companion matrix deben tener módulo < 1 (estar dentro del círculo unitario).`;
+  html += '</div>';
+
+  html += '<div class="eigen-grid">';
+  eigenvals.forEach((ev, i) => {
+    const mod = ev.mod;
+    const cls = mod < 0.999 ? 'inside' : (mod < 1.001 ? 'boundary' : 'outside');
+    const label = ev.imag !== 0
+      ? `${ev.real.toFixed(3)} ${ev.imag >= 0 ? '+' : '−'} ${Math.abs(ev.imag).toFixed(3)}i`
+      : ev.real.toFixed(3);
+    html += `<div class="eigen-chip">
+      <div class="eigen-dot ${cls}"></div>
+      <span>λ<sub>${i + 1}</sub> = ${label}</span>
+      <span style="color:var(--text-muted); margin-left:4px;">|λ| = ${mod.toFixed(3)}</span>
+    </div>`;
+  });
+  html += '</div>';
+
+  const maxMod = Math.max(...eigenvals.map(e => e.mod));
+  html += `<div style="margin-top:0.8rem; font-size:0.75rem;">`;
+  if (maxMod < 0.999) {
+    html += `<span style="color:var(--accent);">✓ Todos |λᵢ| < 1 → Proceso estacionario</span>`;
+  } else if (maxMod < 1.001) {
+    html += `<span style="color:var(--accent3);">⚠ |λ| ≈ 1 → Raíz unitaria — No estacionario</span>`;
+  } else {
+    html += `<span style="color:var(--accent4);">✗ |λ| > 1 → Proceso explosivo</span>`;
+  }
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+function computeEigenvalues() {
+  // For p=1: eigenvalue is just φ₁
+  if (p === 1) {
+    return [{ real: phi[0], imag: 0, mod: Math.abs(phi[0]) }];
+  }
+  // For p=2: solve z² - φ₁z - φ₂ = 0
+  if (p === 2) {
+    const a = 1, b = -phi[0], c = -phi[1];
+    const disc = b * b - 4 * a * c;
+    if (disc >= 0) {
+      const r1 = (-b + Math.sqrt(disc)) / 2;
+      const r2 = (-b - Math.sqrt(disc)) / 2;
+      return [
+        { real: r1, imag: 0, mod: Math.abs(r1) },
+        { real: r2, imag: 0, mod: Math.abs(r2) }
+      ];
+    } else {
+      const realPart = -b / 2;
+      const imagPart = Math.sqrt(-disc) / 2;
+      const mod = Math.sqrt(realPart * realPart + imagPart * imagPart);
+      return [
+        { real: realPart, imag: imagPart, mod },
+        { real: realPart, imag: -imagPart, mod }
+      ];
+    }
+  }
+  // For p=3,4: numerical power iteration approximation
+  // Use companion matrix eigenvalue estimation
+  return numericalEigenvalues(p);
+}
+
+function numericalEigenvalues(dim) {
+  // Simple QR algorithm approximation for small matrices
+  // Build companion matrix
+  let A = [];
+  for (let i = 0; i < dim; i++) {
+    A[i] = new Array(dim).fill(0);
+  }
+  for (let j = 0; j < dim; j++) A[0][j] = phi[j];
+  for (let i = 1; i < dim; i++) A[i][i - 1] = 1;
+
+  // Power iteration for dominant eigenvalue & approximate others
+  // For teaching purposes, we use the characteristic polynomial roots
+  // For p=3: z³ - φ₁z² - φ₂z - φ₃ = 0
+  // For p=4: z⁴ - φ₁z³ - φ₂z² - φ₃z - φ₄ = 0
+  // Use numerical root finding (companion matrix eigenvalues via QR)
+
+  // Simple iterative approach: find roots of p(z) = z^n - φ₁z^(n-1) - ... - φ_n
+  const roots = findPolynomialRoots(dim);
+  return roots;
+}
+
+function findPolynomialRoots(dim) {
+  // Durand-Kerner method for finding polynomial roots
+  // p(z) = z^n - φ₁z^(n-1) - φ₂z^(n-2) - ... - φ_n
+  const coeffs = [1]; // z^n coefficient
+  for (let i = 0; i < dim; i++) coeffs.push(-phi[i]);
+
+  // Initial guesses spread around unit circle
+  let roots = [];
+  for (let i = 0; i < dim; i++) {
+    const angle = (2 * Math.PI * i) / dim + 0.1;
+    roots.push({ re: 0.5 * Math.cos(angle), im: 0.5 * Math.sin(angle) });
+  }
+
+  // Iterate
+  for (let iter = 0; iter < 100; iter++) {
+    for (let i = 0; i < dim; i++) {
+      // Evaluate polynomial at roots[i]
+      const pVal = evalPoly(coeffs, roots[i]);
+      // Product of (roots[i] - roots[j]) for j != i
+      let denom = { re: 1, im: 0 };
+      for (let j = 0; j < dim; j++) {
+        if (i === j) continue;
+        const diff = { re: roots[i].re - roots[j].re, im: roots[i].im - roots[j].im };
+        denom = cMul(denom, diff);
+      }
+      const correction = cDiv(pVal, denom);
+      roots[i].re -= correction.re;
+      roots[i].im -= correction.im;
+    }
+  }
+
+  return roots.map(r => ({
+    real: Math.abs(r.re) < 1e-10 ? 0 : r.re,
+    imag: Math.abs(r.im) < 1e-10 ? 0 : r.im,
+    mod: Math.sqrt(r.re * r.re + r.im * r.im)
+  }));
+}
+
+function evalPoly(coeffs, z) {
+  // Horner's method for complex z
+  let result = { re: coeffs[0], im: 0 };
+  for (let i = 1; i < coeffs.length; i++) {
+    result = cMul(result, z);
+    result.re += coeffs[i];
+  }
+  return result;
+}
+
+function cMul(a, b) {
+  return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re };
+}
+
+function cDiv(a, b) {
+  const d = b.re * b.re + b.im * b.im;
+  if (d < 1e-20) return { re: 0, im: 0 };
+  return { re: (a.re * b.re + a.im * b.im) / d, im: (a.im * b.re - a.re * b.im) / d };
+}
+
+/* ── Numeric table ── */
+function buildNumericTable() {
+  const table = document.getElementById('num-table');
+  const nRows = 15;
+  const maxOrder = Math.max(currentModel !== 'ma' ? p : 0, currentModel !== 'ar' ? q : 0);
+
+  // Generate noise
+  const noise = [];
+  for (let i = 0; i < nRows + maxOrder + 5; i++) noise.push(randn());
+
+  // Generate series
+  const y = new Array(nRows + maxOrder + 5).fill(0);
+  for (let t = maxOrder; t < y.length; t++) {
+    let val = noise[t]; // u_t
+    if (currentModel !== 'ma') {
+      for (let i = 0; i < p; i++) {
+        val += phi[i] * y[t - i - 1];
+      }
+    }
+    if (currentModel !== 'ar') {
+      for (let i = 0; i < q; i++) {
+        val += theta[i] * noise[t - i - 1];
+      }
+    }
+    y[t] = val;
+  }
+
+  // Build table header
+  let headerHtml = '<thead><tr><th>t</th>';
+  headerHtml += '<th>y<sub>t</sub></th>';
+  if (currentModel !== 'ma') {
+    for (let i = 1; i <= p; i++) headerHtml += `<th>y<sub>t−${i}</sub></th>`;
+  }
+  headerHtml += '<th>u<sub>t</sub></th>';
+  if (currentModel !== 'ar') {
+    for (let i = 1; i <= q; i++) headerHtml += `<th>u<sub>t−${i}</sub></th>`;
+  }
+  headerHtml += '<th>Cálculo</th>';
+  headerHtml += '</tr></thead>';
+
+  // Build rows
+  let bodyHtml = '<tbody>';
+  const startT = maxOrder;
+  for (let row = 0; row < nRows; row++) {
+    const t = startT + row;
+    bodyHtml += '<tr>';
+    bodyHtml += `<td>${row + 1}</td>`;
+    bodyHtml += `<td class="val-result">${y[t].toFixed(3)}</td>`;
+
+    if (currentModel !== 'ma') {
+      for (let i = 1; i <= p; i++) {
+        bodyHtml += `<td class="val-lag">${y[t - i].toFixed(3)}</td>`;
+      }
+    }
+
+    bodyHtml += `<td class="val-u">${noise[t].toFixed(3)}</td>`;
+
+    if (currentModel !== 'ar') {
+      for (let i = 1; i <= q; i++) {
+        bodyHtml += `<td class="val-u">${noise[t - i].toFixed(3)}</td>`;
+      }
+    }
+
+    // Calculation string
+    let calc = '';
+    if (currentModel !== 'ma') {
+      const arTerms = [];
+      for (let i = 0; i < p; i++) {
+        arTerms.push(`${phi[i].toFixed(2)}×${y[t - i - 1].toFixed(2)}`);
+      }
+      calc += arTerms.join(' + ');
+      calc += ` + ${noise[t].toFixed(2)}`;
+    } else {
+      calc += `${noise[t].toFixed(2)}`;
+    }
+
+    if (currentModel !== 'ar') {
+      for (let i = 0; i < q; i++) {
+        const tv = theta[i];
+        calc += ` ${tv >= 0 ? '+' : '−'} ${Math.abs(tv).toFixed(2)}×${noise[t - i - 1].toFixed(2)}`;
+      }
+    }
+
+    bodyHtml += `<td style="font-size:0.65rem; color:var(--text-muted); white-space:nowrap;">${calc}</td>`;
+    bodyHtml += '</tr>';
+  }
+  bodyHtml += '</tbody>';
+
+  table.innerHTML = headerHtml + bodyHtml;
+}
+
+/* ── Simulation ── */
+function buildSimulation() {
+  const noise = [];
+  for (let i = 0; i < N_SIM + 20; i++) noise.push(randn());
+
+  const maxOrder = Math.max(currentModel !== 'ma' ? p : 0, currentModel !== 'ar' ? q : 0);
+  const y = new Array(N_SIM + 20).fill(0);
+
+  for (let t = maxOrder; t < y.length; t++) {
+    let val = noise[t];
+    if (currentModel !== 'ma') {
+      for (let i = 0; i < p; i++) val += phi[i] * y[t - i - 1];
+    }
+    if (currentModel !== 'ar') {
+      for (let i = 0; i < q; i++) val += theta[i] * noise[t - i - 1];
+    }
+    y[t] = isFinite(val) ? val : 0;
+  }
+
+  const series = y.slice(maxOrder + 10, maxOrder + 10 + N_SIM);
+  const capped = series.map(v => Math.max(-100, Math.min(100, v)));
+
+  // Main chart
+  const ctx1 = document.getElementById('simChart');
+  if (simChart) simChart.destroy();
+  simChart = new Chart(ctx1, {
+    type: 'line',
+    data: {
+      labels: Array.from({ length: N_SIM }, (_, i) => i + 1),
+      datasets: [{
+        data: capped,
+        borderColor: currentModel === 'ma' ? '#60a5fa' : (currentModel === 'arma' ? '#a78bfa' : '#4ade80'),
+        borderWidth: 1.2,
+        pointRadius: 0,
+        tension: 0,
+        fill: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: {
+        x: {
+          ticks: { color: '#64748b', font: { family: 'IBM Plex Mono', size: 10 }, maxTicksLimit: 8 },
+          grid: { color: 'rgba(100,116,139,0.08)' },
+          border: { color: 'rgba(100,116,139,0.2)' }
+        },
+        y: {
+          ticks: { color: '#64748b', font: { family: 'IBM Plex Mono', size: 10 }, maxTicksLimit: 6, callback: v => v.toFixed(1) },
+          grid: { color: 'rgba(100,116,139,0.08)' },
+          border: { color: 'rgba(100,116,139,0.2)' }
+        }
+      }
+    }
+  });
+
+  document.getElementById('sim-subtitle').textContent = `${getModelLabel()} — ${N_SIM} observaciones simuladas`;
+
+  // ACF chart
+  const acfData = computeACF(capped, 15);
+  const conf = 1.96 / Math.sqrt(capped.length);
+  const ctx2 = document.getElementById('acfSimChart');
+  if (acfSimChart) acfSimChart.destroy();
+  acfSimChart = new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels: Array.from({ length: 15 }, (_, i) => i + 1),
+      datasets: [
+        {
+          label: 'ACF',
+          data: acfData,
+          backgroundColor: acfData.map(v => Math.abs(v) > conf
+            ? (currentModel === 'ma' ? 'rgba(96,165,250,0.65)' : (currentModel === 'arma' ? 'rgba(167,139,250,0.65)' : 'rgba(74,222,128,0.65)'))
+            : 'rgba(100,116,139,0.35)'),
+          borderWidth: 0
+        },
+        {
+          type: 'line', label: '+95%',
+          data: new Array(15).fill(conf),
+          borderColor: 'rgba(96,165,250,0.5)', borderWidth: 1, borderDash: [4, 3], pointRadius: 0, fill: false
+        },
+        {
+          type: 'line', label: '−95%',
+          data: new Array(15).fill(-conf),
+          borderColor: 'rgba(96,165,250,0.5)', borderWidth: 1, borderDash: [4, 3], pointRadius: 0, fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 250 },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.datasetIndex === 0 ? ` ACF(${ctx.label}) = ${ctx.raw.toFixed(4)}` : '' } } },
+      scales: {
+        x: { ticks: { color: '#64748b', font: { family: 'IBM Plex Mono', size: 10 } }, grid: { display: false }, border: { color: 'rgba(100,116,139,0.2)' }, title: { display: true, text: 'Rezago', color: '#64748b', font: { size: 11 } } },
+        y: { min: -1.1, max: 1.1, ticks: { color: '#64748b', font: { family: 'IBM Plex Mono', size: 10 }, callback: v => v.toFixed(1) }, grid: { color: 'rgba(100,116,139,0.08)' }, border: { color: 'rgba(100,116,139,0.2)' } }
+      }
+    }
+  });
+}
+
+function computeACF(data, maxLag) {
+  const n = data.length;
+  const mean = data.reduce((a, b) => a + b, 0) / n;
+  const vari = data.reduce((a, b) => a + (b - mean) ** 2, 0) / n;
+  if (vari === 0) return new Array(maxLag).fill(0);
+  const acf = [];
+  for (let lag = 1; lag <= maxLag; lag++) {
+    let cov = 0;
+    for (let i = lag; i < n; i++) cov += (data[i] - mean) * (data[i - lag] - mean);
+    acf.push(cov / (n * vari));
+  }
+  return acf;
+}
+
+/* ── Diagnosis ── */
+function updateDiagnosis() {
+  const dot = document.getElementById('status-dot');
+  const label = document.getElementById('status-label');
+  const desc = document.getElementById('status-desc');
+
+  if (currentModel === 'ma') {
+    dot.className = 'status-dot green';
+    label.textContent = 'Siempre estacionario';
+    desc.textContent = `MA(${q}) es estacionario por definición: es una combinación lineal finita de ruido blanco.`;
+    return;
+  }
+
+  // Check AR stationarity via eigenvalues
+  const eigenvals = computeEigenvalues();
+  const maxMod = Math.max(...eigenvals.map(e => e.mod));
+
+  if (maxMod < 0.999) {
+    dot.className = 'status-dot green';
+    label.textContent = 'Estacionario';
+    desc.textContent = `Todos los eigenvalores |λ| < 1. Máximo |λ| = ${maxMod.toFixed(3)}. El proceso ${getModelLabel()} revierte a su media de largo plazo.`;
+  } else if (maxMod < 1.001) {
+    dot.className = 'status-dot yellow';
+    label.textContent = 'Raíz unitaria';
+    desc.textContent = `|λ| ≈ 1. El proceso tiene raíz unitaria y no es estacionario. La varianza crece con t.`;
+  } else {
+    dot.className = 'status-dot red';
+    label.textContent = 'Explosivo';
+    desc.textContent = `|λ| = ${maxMod.toFixed(3)} > 1. El proceso es explosivo: los valores divergen sin límite.`;
+  }
+}
+
+/* ── Tab switching ── */
+function switchTab(name, clickedBtn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if (clickedBtn) clickedBtn.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+/* ── Master refresh ── */
+function refresh() {
+  buildEquations();
+  buildLagSteps();
+  buildFinanceExample();
+  buildMatrixDisplay();
+  buildEigenDisplay();
+  buildNumericTable();
+  buildSimulation();
+  updateDiagnosis();
+}
+
+/* ── Event listeners ── */
+document.getElementById('p-slider').addEventListener('input', function () {
+  p = parseInt(this.value);
+  document.getElementById('p-display').textContent = p;
+  buildARSliders();
+  clearPreset();
+  refresh();
+});
+
+document.getElementById('q-slider').addEventListener('input', function () {
+  q = parseInt(this.value);
+  document.getElementById('q-display').textContent = q;
+  buildMASliders();
+  clearPreset();
+  refresh();
+});
+
+/* ── Init ── */
+buildPresets();
+buildARSliders();
+buildMASliders();
+updateControlsVisibility();
+applyPreset(0);
+</script>
+</body>
+</html>
